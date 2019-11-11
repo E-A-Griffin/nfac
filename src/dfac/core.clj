@@ -3,7 +3,25 @@
             [quil.middleware :as m]))
 
 ;; Holds current ellipses in format:
-;; {"x-y" {:name \"name\" :x x :y y :h 0-255 :s 0-255 :v 0-255}}
+;; {"x-y" {:name "name" :x x :y y :h 0-255 :s 0-255 :v 0-255
+;;         :out {"out-state1" '(\a \b \c)
+;;               "out-state2" '(\d \e \f)}
+;;         :in  {"in-state1"  '(\a \b)
+;;               "in-state2"  '(\c)}}}
+;;
+;; :x and :y represent cartesian coordinate values
+;;
+;; :h, :s, and :v are the numeric values to represent the color
+;; of the ellipse/state in hsv-mode
+;;
+;; :out contains a map of strings for keys, which represent the names
+;; of ellipses/states the given ellipse/state has a transition function to
+;; and lists of characters representing characters to traverse the given
+;; function on
+;;
+;; :in contains a map of strings for keys, which represent the names
+;; of ellipses/states the given ellipse/state has a receiving (inward)
+;; transition function for and lists of characters representing characters ;; to traverse the given function on
 (def objects (atom {}))
 
 ;; Radius of ellipses
@@ -47,9 +65,15 @@
   [ellipse] (-> ellipse val :selected true?))
 
 (defn from?
+  "Returns true if ellipse was selected first, during transition mode.
+  Useful for returning the first member of a pair of ellipses/states to be
+  joined via a transition function."
   [ellipse] (-> ellipse val :from true?))
 
 (defn to?
+  "Returns true if ellipse was selected second, during connect mode.
+  Useful for returning the second member of a pair of ellipses/states to be
+  joined via a transition function."
   [ellipse] (-> ellipse val :to true?))
 
 (defn get-selected
@@ -59,10 +83,16 @@
   (->> ellipses (some #(if (selected? %) %)) (apply map-entry)))
 
 (defn get-from
+  "Returns first ellipse from collection that returns true
+  for (from? ellipse). Returns ellipse that was selected first,
+  during transition mode."
   [ellipses]
   (->> ellipses (some #(if (from? %) %)) (apply map-entry)))
 
 (defn get-to
+  "Returns first ellipse from collection that returns true
+  for (to? ellipse). Returns ellipse that was selected second,
+  during transition mode."
   [ellipses]
   (->> ellipses (some #(if (to? %) %)) (apply map-entry)))
 
@@ -86,7 +116,9 @@
       (q/line 0 0 20 20)
       (q/line 0 0 20 -20))))
 
-(defn display-ellipse [ellipse]
+(defn display-ellipse
+  "Draw ellipse passed as argument to screen"
+  [ellipse]
   (let [x    (getx ellipse)
         y    (gety ellipse)
         name (getname ellipse)]
@@ -108,7 +140,10 @@
       (do (display-ellipse current)
           (recur (rest remaining) (first remaining))))))
 
-(defn erase-char [x y] (q/with-stroke [0 0 255] (q/with-fill [0 0 255] (q/rect x y 5 5))))
+(defn erase-char
+  "Unfinished/needs testing: erases character at [x y] by
+  drawing a white box around character"
+  [x y] (q/with-stroke [0 0 255] (q/with-fill [0 0 255] (q/rect x y 5 5))))
 
 (defn put-letter-transition
   "Prompts user for single character input, then prints above or below
@@ -124,12 +159,10 @@
         (q/text (str ch) 0 (- 0 disp))))))
 
 (defn connect-ellipses
-  "Connect two ellipses via a line with direction. b->a? specifies whether to
-  connect from below to above (if true), a->b? specifies whether to connect
-  from above to below (if true). In the event that the ellipses have the same
-  y-values and varying x-values, b->a? determines whether the ellipses will
-  be connected right->left and a->b? determines whether the ellipses will be
-  connected left->right"
+  "Connect two ellipses via a line with direction. f->t? specifies whether to
+  connect from 'from' to 'to' (if true), a->b? specifies whether to connect
+  from 'to' to 'from' (if true). Draws current value of (q/raw-key) above
+  transition function arrow. Returns current value of (q/raw-key)"
   ([from to f->t? t->f?]
    (let [xt             (getx to)
          yt             (gety to)
@@ -182,8 +215,8 @@
 
      (display-ellipses [from to])
      transition-ch))
-  ;; Connect ellipses both ways
-  ([from to] (connect-ellipses from to true true)))
+  ;; Connect ellipses 'from'->'to'
+  ([from to] (connect-ellipses from to true false)))
 
 (defn setup []
   ;; Set background to white
@@ -198,12 +231,11 @@
    :mode :create})
 
 (defn update-state [state]
-  ;; Update sketch state by changing circle color and position.
+  ;; Update sketch state by changing color
   {:color (mod (+ (:color state) 0.7) 255)
    :mode (:mode state)})
 
 (defn draw-state [state]
-  ;; Clear the sketch by filling it with light-grey color.
   ;; Set circle color.
   (q/fill (:color state) 255 255)
   ;; Calculate x and y coordinates of the circle.
@@ -214,56 +246,66 @@
     (case (:mode state)
       ;; If mouse-pressed & in create mode, create new state
       :create (when-let
-                    ;; Format: Single-entry map of the form
-                    ;;         k: "x-y"
-                    ;;         v: {:name "name" :x x :y y :h 0-255 :s 0-255 :v 0-255}
+                  ;; Format: Map-Entry of the form
+                  ;;
+                  ;; k: "x-y"
+                  ;; v: {:name "name" :x x :y y :h 0-255 :s 0-255 :v 0-255}
                   [ellipse (if (q/mouse-pressed?)
-                                (array-map (str \q (count @objects))
+                                (map-entry (str \q (count @objects))
                                  {:name (str \q (count @objects))
                                   :x x :y y
                                   :h color :s 255 :v 255}))]
 
-                  ;; Prevent click from being processed as multiple clicks which
-                  ;; would create multiple states for a single click
+                  ;; Prevent click from being processed as multiple clicks
+                  ;; which would create multiple states/ellipses for a
+                  ;; single click
                   (Thread/sleep 50)
-                  (display-ellipse (first ellipse))
+                  (display-ellipse ellipse)
                   (swap! objects conj ellipse))
-      ;; If ellipse clicked & in transition mode, mark ellipse as "selected" and
-      ;; switch to connect mode
+      ;; If ellipse clicked & in transition mode, mark ellipse as "from"
+      ;; and switch to connect mode
       :transition (when-let
-                      ;; Format: 2-entry vector
-                      ;; ["name" {:x x :y y :h 0-255 :s 0-255 :v 0-255}]
                       [captured
                        (and (q/mouse-pressed?) (capture-ellipse @objects x y))]
                     (swap! objects assoc (key captured) (assoc (val captured) :from true))
 
-                    ;; First state selected, switch mode so that next
-                    ;; state selected will initiate connecting states via
-                    ;; transition function.
+                    ;; First/'from' state selected, switch mode so that
+                    ;; next/'to' state may be selected
                     (swap! (q/state-atom) assoc-in [:mode] :connect)
 
-                    ;; Prevent single click from being processed as duplicate clicks
+                    ;; Prevent single click from being processed as
+                    ;; multiple clicks which would create multiple
+                    ;; states/elipses for a single click
                     (Thread/sleep 50))
 
       ;; If first ellipse selected previously, new ellipse clicked, & in
-      ;; connect mode, connect ellipses with arrow
+      ;; connect mode, set respective ellipses to 'from' and 'to' and move
+      ;; to poll mode while waiting for the user to input a character for
+      ;; the transition function.
       :connect (when-let
-                   ;; Format: 2-entry vector
-                   ;; ["name" {:x x :y y :h 0-255 :s 0-255 :v 0-255}]
                    [to (if (q/mouse-pressed?) (capture-ellipse @objects x y))]
                  (let [from (get-from @objects)]
                    (when-not (= from to)
                      (swap! objects assoc (key to) (assoc (val to) :to true))
                      (swap! (q/state-atom) assoc-in [:mode] :poll)
                      (Thread/sleep 50))))
+      ;; Once user enters a character for the transition function. Create
+      ;; transition function between 'from' selected in transition mode and
+      ;; 'to' selected in connect mode.
       :poll (when (q/key-pressed?)
+              ;; Create transition function
               (let [from (get-from @objects)
                     to   (get-to @objects)
-                    transition-ch (connect-ellipses from to true false)]
+                    transition-ch (connect-ellipses from to)]
+                ;; Strip 'from' and 'to' of their respective labels
+                ;; indicating they're ready to be connected and update
+                ;; 'from' and 'to' so that their new transition function
+                ;; is listed in each's :out/:in map.
                 (swap! objects assoc (key from) (update-in (dissoc (val from) :from) [:out (getname to)] conj transition-ch))
                 (swap! objects assoc (key to) (dissoc (val to) :to))
+
+                ;; Return to create mode
                 (swap! (q/state-atom) assoc-in [:mode] :create))))
-              ;;(connect-ellipses (flatten (take 2 (filter selected? @objects))) true false)))
 
     (if (q/key-pressed?)
       (case (q/raw-key)

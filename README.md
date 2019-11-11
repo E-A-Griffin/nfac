@@ -1,6 +1,6 @@
-# quil-test
+# DFAC - Deterministic Finite Automata Creator
 
-A Quil sketch designed to ... well, that part is up to you.
+Application built in Clojure using the Quil library for constructing Deterministic Finite Automata and testing input strings for membership in the language described by the user's automaton.
 
 ## Usage
 
@@ -12,7 +12,6 @@ REPL - run `(require 'quil-test.core)`.
 
 ## License
 
-Copyright © 2016 FIXME
+Copyright © 2016
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the Eclipse Public License version 1.0.
