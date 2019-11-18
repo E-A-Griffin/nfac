@@ -1,6 +1,6 @@
 # DFAC - Deterministic Finite Automata Creator
 <p align="center">
-        <img width="382" height="188" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFALogo.png">
+        <img width="382" height="188" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFA-Logo.png">
  </p>
 Application built in Clojure using the Quil library for constructing Deterministic Finite Automata and testing input strings for membership in the language described by the user's automaton.
 
