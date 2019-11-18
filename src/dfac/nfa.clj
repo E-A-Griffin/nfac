@@ -63,7 +63,7 @@
         valid-transitions (filter (fn [t]
                                          (and (not (empty? in-str))
                                               (or (= (:accepts t) c)
-                                                  (= (:accepts t) "lambda")))) transitions)]
+                                                  (= (:accepts t) \λ)))) transitions)]
     
     (cond (empty? in-str) ;if the string is empty,
           (if (= (:final? node) true) ;check to see if the current node is final
@@ -76,7 +76,7 @@
 
           (not (empty? valid-transitions))      ;If there ARE valid transitions
           (doseq [transition valid-transitions]
-            (cond (= (:accepts transition) "lambda")
+            (cond (= (:accepts transition) \λ)
                   (go (test-string-r in-str (get-state-node (:end-state transition))))
                   :else
                   (go (test-string-r str-rest (get-state-node (:end-state transition)))))))))
@@ -99,7 +99,7 @@
       :end-state | STRING | contains the label for the destination node"
 
   ([begin-state end-state]
-   {:accepts "lambda"
+   {:accepts \λ
     :begin-state begin-state
     :end-state end-state})
   ([accepts begin-state end-state]
