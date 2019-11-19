@@ -61,15 +61,20 @@
         cur-node-label (:label node)
         transitions (:transitions node)
         valid-transitions (filter (fn [t]
-                                         (and (not (empty? in-str))
-                                              (or (= (:accepts t) c)
-                                                  (= (:accepts t) \λ)))) transitions)]
+                                    (or (= (:accepts t) c)
+                                        (= (:accepts t) \λ))) transitions)
+        contains-lambda? (not (empty? (filter (fn [t] (= (:accepts t) \λ)) valid-transitions)))]
     
     (cond (empty? in-str) ;if the string is empty,
-          (if (= (:final? node) true) ;check to see if the current node is final
-            (do (>!! @nfa-chan (response true node)) ;if it is, Wonderful! Put a response into the channel
-                (close! @nfa-chan))                  ;and close it.
-            (>!! @nfa-chan (response false node))) ;Otherwise, it's not valid.
+          (cond (= (:final? node) true) ;check to see if the current node is final
+                (do (>!! @nfa-chan (response true node)) ;if it is, Wonderful! Put a response into the channel
+                    (close! @nfa-chan))                  ;and close it.
+                (= contains-lambda? true)
+                (doseq [transition valid-transitions]
+                  (if (= (:accepts transition) \λ)
+                    (go (test-string-r in-str (get-state-node (:end-state transition))))))
+                :else
+                (>!! @nfa-chan (response false node))) ;Otherwise, it's not valid.
 
           (empty? valid-transitions) ;if there are no valid transitions but the string still has characters to test,
           (>!! @nfa-chan (response false node)) ;return a false response.
@@ -200,3 +205,13 @@
                            (transition \h "q7" "q8"))]
     (add-transition transition)))
 
+(defn test-state-2 []
+  (doseq [node (list (node "q0" true false [])
+                     (node "q1" false false [])
+                     (node "q2" false true [])
+                     (node "q3" false true []))]
+    (add-node node))
+  (doseq [transition (list (transition \a "q0" "q1")
+                           (transition "q1" "q3")
+                           (transition \b "q1" "q2"))]
+    (add-transition transition)))
