@@ -186,6 +186,7 @@
   (reset! nfa-state state-map))
 
 (defn test-load-state []
+  (clear-state)
   (doseq [node (list (node "q1" true false [])
                      (node "q2")
                      (node "q3")
@@ -206,6 +207,7 @@
     (add-transition transition)))
 
 (defn test-state-2 []
+  (clear-state)
   (doseq [node (list (node "q0" true false [])
                      (node "q1" false false [])
                      (node "q2" false true [])
@@ -214,4 +216,43 @@
   (doseq [transition (list (transition \a "q0" "q1")
                            (transition "q1" "q3")
                            (transition \b "q1" "q2"))]
+    (add-transition transition)))
+
+
+(defn test-state-3 []
+  (clear-state)
+  (doseq [node (list (node "1" true false [])
+                     (node "2" false false [])
+                     (node "3" false false [])
+                     (node "4" false false [])
+                     (node "5" false true []))]
+    (add-node node))
+  (doseq [transition (list (transition "1" "2")
+                           (transition "1" "3")
+                           (transition "3" "5")
+                           (transition "2" "5")
+                           (transition \a "2" "2")
+                           (transition \b "5" "5")
+                           (transition \a "3" "4")
+                           (transition \b "4" "3"))]
+    (add-transition transition)))
+
+(defn test-state-4 []
+  (clear-state)
+  (doseq [node (list (node "q0" true false [])
+                     (node "q1" false false [])
+                     (node "q2" false false [])
+                     (node "q3" false false [])
+                     (node "q4" false false [])
+                     (node "q5" false false []))]
+    (add-node node))
+  (doseq [transition (list (transition "q0" "q1")
+                           (transition "q0" "q2")
+                           (transition \a "q1" "q3")
+                           (transition \b "q3" "q1")
+                           (transition \a "q2" "q4")
+                           (transition \b "q4" "q5")
+                           (transition \a "q5" "q2")
+                           (transition \a "3" "4")
+                           (transition \b "4" "3"))]
     (add-transition transition)))
