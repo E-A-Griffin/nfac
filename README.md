@@ -1,4 +1,4 @@
-# NFAC - Non-Deterministic Finite Automata Creator
+# nfac - Non-Deterministic Finite Automata Creator
 <p align="center">
         <img width="389" height="155" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFA-Logo.png">
  </p>
