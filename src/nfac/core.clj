@@ -232,7 +232,10 @@
   "Connect two states via a line with direction. f->t? specifies whether to
   connect from 'from' to 'to' (if true), a->b? specifies whether to connect
   from 'to' to 'from' (if true). Draws current value of transition-ch above
-  transition function arrow. Returns current value of transition-ch."
+  transition function arrow. Returns current value of transition-ch.
+  Re-draw? is true when an NFA is intended to be re-drawn after having
+  been erased previously. This parameter is necessary to ensure that
+  no duplicate transition characters are printed."
   ([from to f->t? t->f? transition-ch displacement]
    (let [xt             (getx to)
          yt             (gety to)
@@ -264,8 +267,7 @@
 
      (do (when f->t?
            (add-> f->t-x f->t-y (+ angle-offset angle))
-           (if-not (transition-exists? from to transition-ch)
-             (put-letter-transition f->t-x f->t-y transition-ch angle displacement)))
+           (put-letter-transition f->t-x f->t-y transition-ch angle displacement))
          (when t->f?
            (add-> t->f-x t->f-y (+ (- angle-offset q/PI) angle))
            (put-letter-transition t->f-x t->f-y transition-ch angle displacement)))
@@ -275,13 +277,11 @@
   ([from to transition-ch displacement]
    ;; Case: connect state to itself to form a loop.
    (if (= from to)
-     (if-not (transition-exists? from to transition-ch)
-       (do (add-loop (getx from) (gety from))
-           (display-state from)
-           (put-letter-transition (getx from) (- (gety from) r) transition-ch
-                                  0 displacement)
-           transition-ch)
-       transition-ch)
+     (do (add-loop (getx from) (gety from))
+         (display-state from)
+         (put-letter-transition (getx from) (- (gety from) r) transition-ch
+                                0 displacement)
+         transition-ch)
      (connect-states from to true false transition-ch displacement)))
   ;; Connect states 'from'->'to'. Two arg forms checks for and handles
   ;; loops as well. Call 4-arity version of connect-states with current value of q/raw-key
@@ -297,7 +297,6 @@
   state alone. Note, flips order of transition characters on each draw.
   Since order doesn't matter, this is left alone."
   [states]
-
   (q/background 255)
   ;; Draw triangle indicating which ellipse represents initial state
   (let [start-key (f->b/get-start-node states)]
@@ -475,9 +474,8 @@
                 ;; 'from' and 'to' so that their new transition function
                 ;; is listed in each's :out/:in map.
                 (when-not (transition-exists? from to transition-ch)
-                  (prn transition-ch)
                   (if-not (= from to)
-                    (do (prn "yeehaw!")
+                    (do
                         (swap! objects assoc (key from)
                                (update-in
                                 ;; Strip :from pair from val
@@ -524,21 +522,19 @@
                                     (key (last @objects)) (key delete)))
                                  (last @objects))]
                       (do (swap! objects assoc (key delete)
-                             (assoc (val last-o) :name (getname delete)))
+                                 (assoc (val last-o) :name (getname delete)))
                       (if (-> delete val :start? true?) (swap! objects assoc-in [(key delete) :start?] true))
                       (swap! objects dissoc (key last-o))
                       (swap! objects nested-rename-key
                              (key last-o) (key delete)))
-                      (prn (count @objects)))
-                    (comment (when-let [last-o (if (-> delete val :start? true?)
+                      (when-let [last-o (if (-> delete val :start? true?)
                                         (last @objects))]
-                      (swap! objects assoc (key delete)
-                             (assoc (val last-o) :name (getname delete)))
-                      (swap! objects assoc-in [(key delete) :start?] true)
-                      (swap! objects dissoc (key last-o))
-                      (swap! objects nested-rename-key (key last-o) (key delete))))
+                        (swap! objects assoc (key delete)
+                               (assoc (val last-o) :name (getname delete)))
+                        (swap! objects assoc-in [(key delete) :start?] true)
+                        (swap! objects dissoc (key last-o))
+                        (swap! objects nested-rename-key (key last-o) (key delete))))
                     (display-nfa @objects)))
-                ;;(display-nfa @objects)
                 (swap! (q/state-atom) assoc-in [:mode] :create))
       :set-start (when-let
                      [start (if (q/mouse-pressed?)

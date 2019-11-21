@@ -42,7 +42,8 @@
                 (q/state :selected)))))]
     ;; Very basic validation to ensure proper map was loaded to reset!
     ;; objects with
-    (when (and (map? loaded-m) (every? string? (keys loaded-m))
+    (when (and (not (empty? loaded-m))
+               (map? loaded-m) (every? string? (keys loaded-m))
                (every? map? (vals loaded-m)))
       (reset! objects loaded-m)
       (swap! objects assoc :reload true))))
