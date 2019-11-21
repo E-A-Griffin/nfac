@@ -240,8 +240,8 @@
 (defn test-state-4 []
   (clear-state)
   (doseq [node (list (node "q0" true false [])
-                     (node "q1" false false [])
-                     (node "q2" false false [])
+                     (node "q1" false true [])
+                     (node "q2" false true [])
                      (node "q3" false false [])
                      (node "q4" false false [])
                      (node "q5" false false []))]
