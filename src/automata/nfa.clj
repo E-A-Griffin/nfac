@@ -3,14 +3,16 @@
              :as async
              :refer [>! <! >!! <!!
                      go chan buffer close!
-                     thread]]))
+                     thread
+                     offer! poll!]]))
 
 (def nfa-state (atom {:start-node nil
                       :nodes nil}))
 
 (def nfa-chan
   "This atom contains the async channel that will hold the result of the string test"
-  (atom (chan (async/sliding-buffer 1))))
+  (atom (chan 1 (comp (filter :result)
+                      (take 1)))))
 
 (defn node
   "This function returns a map representing a node. The map is composed of
@@ -51,50 +53,78 @@
   {:final-node (keyword (:label node))
    :result result})
 
-
+(def debug-message (chan))
 
 (defn test-string-r
   "This function is a recursive and multi-threaded implementation of a NFA/NFA traversal algorithm. It accepts an input string (in-str) and a node (node), and tests whether or not the transitions originating from that node will accept the in-str value. If it does, then the evaluation is placed on another thread, along with all of the other valid transitions originating from this node, and evaluated recursively until either no result is found, or the string tests true, at which point the async channel closes and no further data can be pushed into it."
-  [in-str node]
-  (let [c (first in-str)
-        str-rest (clojure.string/join (rest in-str))
-        cur-node-label (:label node)
-        transitions (:transitions node)
-        valid-transitions (filter (fn [t]
-                                    (or (= (:accepts t) c)
-                                        (= (:accepts t) \λ))) transitions)
-        contains-lambda? (not (empty? (filter (fn [t] (= (:accepts t) \λ)) valid-transitions)))]
-    
-    (cond (empty? in-str) ;if the string is empty,
-          (cond (= (:final? node) true) ;check to see if the current node is final
-                (do (>!! @nfa-chan (response true node)) ;if it is, Wonderful! Put a response into the channel
-                    (close! @nfa-chan))                  ;and close it.
-                (= contains-lambda? true)
-                (doseq [transition valid-transitions]
-                  (if (= (:accepts transition) \λ)
-                    (go (test-string-r in-str (get-state-node (:end-state transition))))))
-                :else
-                (>!! @nfa-chan (response false node))) ;Otherwise, it's not valid.
+  [in-str node depth]
+  (go (if (< 0 depth)
+        (let [c (first in-str)
+              str-rest (clojure.string/join (rest in-str))
+              cur-node-label (:label node)
+              transitions (:transitions node)
+              valid-transitions (filter (fn [t]
+                                          (or (= (:accepts t) c)
+                                              (= (:accepts t) \λ))) transitions)
+              contains-lambda? (not (empty? (filter (fn [t] (= (:accepts t) \λ)) valid-transitions)))]
 
-          (empty? valid-transitions) ;if there are no valid transitions but the string still has characters to test,
-          (>!! @nfa-chan (response false node)) ;return a false response.
+          (cond (empty? in-str)               ;if the string is empty,
+                (cond (= (:final? node) true) ;check to see if the current node is final
+                      (response true node) ;if it is, Wonderful! Put a response into the
+                      (= contains-lambda? true)
+                      (or (->> (for [transition valid-transitions]
+                                 (if (= (:accepts transition) \λ)
+                                   (test-string-r in-str
+                                                  (get-state-node (:end-state transition))
+                                                  (dec depth))))
+                               (into [])
+                               async/merge
+                               (async/into [])
+                               <!
+                               (filter :result)
+                               first)
+                          (response false node))
+                      :else
+                      (response false node)) ;Otherwise, it's not valid.
 
-          (not (empty? valid-transitions))      ;If there ARE valid transitions
-          (doseq [transition valid-transitions]
-            (cond (= (:accepts transition) \λ)
-                  (go (test-string-r in-str (get-state-node (:end-state transition))))
-                  :else
-                  (go (test-string-r str-rest (get-state-node (:end-state transition)))))))))
+                (empty? valid-transitions) ;if there are no valid transitions but the string still has characters to test,
+                (response false node)      ;return a false response.
+
+                (not (empty? valid-transitions)) ;If there ARE valid transitions
+                (if (= 1 (count valid-transitions))
+                  (if (= (:accepts (first valid-transitions)) \λ)
+                    (<! (test-string-r in-str
+                                       (get-state-node (:end-state (first valid-transitions)))
+                                       (dec depth)))
+                    (<! (test-string-r str-rest
+                                       (get-state-node (:end-state (first valid-transitions)))
+                                       (dec depth))))
+                  (or (->> (for [transition valid-transitions]
+                             (if (= (:accepts transition) \λ)
+                               (test-string-r in-str
+                                              (get-state-node (:end-state transition))
+                                              (dec depth))
+                               (test-string-r str-rest
+                                              (get-state-node (:end-state transition))
+                                              (dec depth))))
+                           (into [])
+                           async/merge
+                           (async/into [])
+                           <!
+                           (filter :result)
+                           first)
+                      (response false node)))))
+        (response false node))))
 
 (defn test-string
   "This is an abstracted version of the recursive function that makes it easier to call
   multiple or new tests."
-  [in-str node-label]
+  ([in-str node-label]
   (let [node (get-state-node node-label)]
-    (reset! nfa-chan (chan (async/sliding-buffer 1)))
-    (test-string-r in-str node)
-    (let [result (<!! @nfa-chan)]
-      result)))
+    (<!! (test-string-r in-str node 50))))
+  ([in-str]
+   (let [node (get-state-node (:start-node @nfa-state))]
+     (<!! (test-string-r in-str node 50)))))
 
 (defn transition
   "This function returns a map that represents a transition. It is composed of the following
@@ -185,7 +215,7 @@
   [state-map]
   (reset! nfa-state state-map))
 
-(defn test-load-state []
+(defn test-state []
   (clear-state)
   (doseq [node (list (node "q1" true false [])
                      (node "q2")
@@ -221,20 +251,20 @@
 
 (defn test-state-3 []
   (clear-state)
-  (doseq [node (list (node "1" true false [])
-                     (node "2" false false [])
-                     (node "3" false false [])
-                     (node "4" false false [])
-                     (node "5" false true []))]
+  (doseq [node (list (node "q1" true false [])
+                     (node "q2" false false [])
+                     (node "q3" false false [])
+                     (node "q4" false false [])
+                     (node "q5" false true []))]
     (add-node node))
-  (doseq [transition (list (transition "1" "2")
-                           (transition "1" "3")
-                           (transition "3" "5")
-                           (transition "2" "5")
-                           (transition \a "2" "2")
-                           (transition \b "5" "5")
-                           (transition \a "3" "4")
-                           (transition \b "4" "3"))]
+  (doseq [transition (list (transition "q1" "q2")
+                           (transition "q1" "q3")
+                           (transition "q3" "q5")
+                           (transition "q2" "q5")
+                           (transition \a "q2" "q2")
+                           (transition \b "q5" "q5")
+                           (transition \a "q3" "q4")
+                           (transition \b "q4" "q3"))]
     (add-transition transition)))
 
 (defn test-state-4 []
