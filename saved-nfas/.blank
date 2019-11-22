@@ -1,0 +1,2 @@
+;; Used to allow GitHub to maintain an "empty" folder. File will be filtered by file IO functions and thus ignored.
+;; Feel free to delete file upon download.
