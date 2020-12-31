@@ -126,6 +126,16 @@
    (let [node (get-state-node (:start-node @nfa-state))]
      (<!! (test-string-r in-str node 50)))))
 
+(defn deep-test-string
+  "Like test-string but makes depth based on length of string, effective for testing that
+  loops work for very long strings."
+  ([in-str node-label]
+  (let [node (get-state-node node-label)]
+    (<!! (test-string-r in-str node (inc (count in-str))))))
+  ([in-str]
+   (let [node (get-state-node (:start-node @nfa-state))]
+     (<!! (test-string-r in-str node (inc (count in-str)))))))
+
 (defn transition
   "This function returns a map that represents a transition. It is composed of the following
   key-value pairs:
@@ -214,6 +224,11 @@
   THE PROPER FORMAT"
   [state-map]
   (reset! nfa-state state-map))
+
+(defn get-final-states
+  "Returns lazy-seq of final-states"
+  []
+  (keys (filter (comp :final? val) (:nodes @nfa-state))))
 
 (defn test-state []
   (clear-state)
