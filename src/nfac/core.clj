@@ -34,14 +34,38 @@
 ;; Radius of ellipses
 (def r 50)
 
+(def color-map
+  {:dark-mode {:background 50
+               :stroke-size 2
+               :stroke-h 255
+               :stroke-s 0
+               :stroke-v 255}
+   :light-mode {:background 255
+                :stroke-size 1
+                :stroke-h 255
+                :stroke-s 0
+                :stroke-v 0}})
+
+(defn set-theme!
+  "Set theme based on current mode"
+  [color-map mode]
+  ;; Don't perform redundant work
+  (when (not= mode (q/state :theme))
+    (let [mode-map (color-map mode)]
+      (q/background (mode-map :background))
+      (q/stroke-weight (mode-map :stroke-size))
+      (q/stroke (mode-map :stroke-h)
+                (mode-map :stroke-s)
+                (mode-map :stroke-v))
+      (swap! (q/state-atom) assoc-in [:theme] mode)
+      ;; Redraw current NFA in current theme
+      (q/background ((color-map (q/state :theme)) :background))
+      (display-nfa @objects))))
+
 (defn map-entry
   "Create a singular map-entry from a key (k) and a value (v)"
   [k v]
   (clojure.lang.MapEntry. k v))
-
-(comment (defn abs
-  "Returns absolute value of number"
-  [n] (if (neg? n) (- n) n)))
 
 (defn getx
   "Input: {\"x-y\" {:name \"name\" :x x :y y}}
@@ -127,13 +151,15 @@
   (let [x (- (getx state) (/ r 2))
         y (gety state)]
     (q/no-fill)
+    ;(apply q/stroke (-> q/state :theme))
     (q/triangle
      (- x (/ r 2)) (- y (/ r 2)) (- x (/ r 2)) (+ y (/ r 2)) x y)))
 
 (defn draw-final-state-sym
   "Draw smaller ellipse inside ellipse to represent final state."
   [state]
-  (q/no-fill) (q/ellipse (+ (getx state) 0.5) (+ (gety state) 0.5) (* r 0.85) (* r 0.85)))
+  (q/no-fill)
+  (q/ellipse (+ (getx state) 0.5) (+ (gety state) 0.5) (* r 0.85) (* r 0.85)))
 
 (defn purge-transitions
   [states delete]
@@ -213,20 +239,25 @@
   [states]
   (loop [remaining (rest states)
          current (first states)]
-    (if current
-      (do (display-state current)
-          (recur (rest remaining) (first remaining))))))
+    (when current
+      (display-state current)
+      (recur (rest remaining) (first remaining)))))
 
 (defn put-letter-transition
-  "Prints user entered character above arrow to signify transition from one  state to another on character. Returns character from input."
+  "Prints user entered character above arrow to signify transition from one
+   state to another on character. Returns character from input."
   [x y ch angle disp]
   (q/rect-mode :center)
   (q/text-align :center)
   ;; Get-key & print
-  (q/with-fill 0 0 0
+  (let [mode-map (color-map (q/state :theme))]
+   (q/fill
+    (mode-map :stroke-h)
+    (mode-map :stroke-s)
+    (mode-map :stroke-v)))
     (q/with-translation [x y]
       (q/with-rotation [angle]
-        (q/text (str ch) 0 (- 0 disp))))))
+        (q/text (str ch) 0 (- 0 disp)))))
 
 (defn connect-states
   "Connect two states via a line with direction. f->t? specifies whether to
@@ -267,10 +298,12 @@
 
      (do (when f->t?
            (add-> f->t-x f->t-y (+ angle-offset angle))
-           (put-letter-transition f->t-x f->t-y transition-ch angle displacement))
+           (put-letter-transition f->t-x f->t-y transition-ch angle
+                                  displacement))
          (when t->f?
            (add-> t->f-x t->f-y (+ (- angle-offset q/PI) angle))
-           (put-letter-transition t->f-x t->f-y transition-ch angle displacement)))
+           (put-letter-transition t->f-x t->f-y transition-ch angle
+                                  displacement)))
 
      (display-states [from to])
      transition-ch))
@@ -297,7 +330,7 @@
   state alone. Note, flips order of transition characters on each draw.
   Since order doesn't matter, this is left alone."
   [states]
-  (q/background 255)
+  ;(q/background 255)
   ;; Draw triangle indicating which ellipse represents initial state
   (let [start-key (f->b/get-start-node states)]
     (draw-start-state-sym (map-entry start-key (get states start-key))))
@@ -306,13 +339,12 @@
       ;; If state contains any transition functions, draw-them
       (doseq [to (-> from val :out)]
         (let [chars (val to)]
-          (do
-            (doseq [transition-ch (val to)]
+          (doseq [transition-ch (val to)]
               (let [to-state (map-entry (key to) (get @objects (key to)))
                     displacement (* 15 (- (count chars)
                                           (.indexOf chars transition-ch)))]
                 (connect-states
-                 from to-state transition-ch displacement))))))
+                 from to-state transition-ch displacement)))))
       ;; Else draw state alone
       (display-state from))))
 
@@ -341,9 +373,14 @@
     \f (swap! (q/state-atom) assoc-in [:mode] :set-final)
     \0 (swap! (q/state-atom) assoc-in [:mode] :set-start)
     \d (swap! (q/state-atom) assoc-in [:mode] :delete)
+    ;; Toggle between dark-mode ("n"ight-mode) and light-mode ("b"right-mode)
+    \n (set-theme! color-map :dark-mode)
+    \b (set-theme! color-map :light-mode)
 
     ;; Redraw sketch based on objects
-    \newline (do (q/background 255) (display-nfa @objects))
+    \newline (do
+               (q/background ((color-map (q/state :theme)) :background))
+               (display-nfa @objects))
 
     ;; Save nfa to file
     \s (apply q/sketch sv/save-ske)
@@ -361,20 +398,20 @@
 
     ;; Test cases for connecting different angles between states
     \~ (do (connect-states (first {"q0" {:name "q0" :x 150 :y 300}})
-                             (first {"q1" {:name "q1" :x 50 :y 300}}))
+                           (first {"q1" {:name "q1" :x 50 :y 300}}))
            (add-loop 150 300)
            (connect-states (first {"q2" {:name "q2" :x 150 :y 300}})
-                             (first {"q3" {:name "q3" :x 150 :y 400}}))
+                           (first {"q3" {:name "q3" :x 150 :y 400}}))
            (connect-states (first {"q4" {:name "q4" :x 600 :y 600}})
-                             (first {"q5" {:name "q5" :x 600 :y 400}}))
+                           (first {"q5" {:name "q5" :x 600 :y 400}}))
            (connect-states (first {"q6" {:name "q6" :x 275 :y 500}})
-                             (first {"q7" {:name "q7" :x 475 :y 350}}))
+                           (first {"q7" {:name "q7" :x 475 :y 350}}))
            (connect-states (first {"q8" {:name "q8" :x 575 :y 500}})
-                             (first {"q9" {:name "q9" :x 475 :y 300}}))
+                           (first {"q9" {:name "q9" :x 475 :y 300}}))
            (connect-states (first {"q10" {:name "q10" :x 375 :y 600}})
-                             (first {"q11" {:name "q11" :x 375 :y 750}}))
+                           (first {"q11" {:name "q11" :x 375 :y 750}}))
            (connect-states (first {"q12" {:name "q12" :x 300 :y 400}})
-                             (first {"q13" {:name "q13" :x 375 :y 300}})))
+                           (first {"q13" {:name "q13" :x 375 :y 300}})))
     \[ (do (q/no-fill) (q/ellipse 365.5 450.5 (* r 0.85) (* r 0.85)))
     nil))
 
@@ -389,12 +426,15 @@
   (reset! objects {})
   {:color 0
    :angle 0
-   :mode :create})
+   :mode :create
+   ;; Default to light-mode
+   :theme :light-mode})
 
 (defn update-state [state]
   ;; Update sketch state by changing color
-  {:color (mod (+ (:color state) 0.7) 255)
-   :mode (:mode state)})
+  {:color (mod (+ (state :color) 0.7) 255)
+   :mode (state :mode)
+   :theme (state :theme)})
 
 (defn draw-state [state]
   ;; Set circle color.
@@ -426,20 +466,21 @@
                                                           (count @objects))
                                                :x x :y y}))]
 
-                ;; Prevent click from being processed as multiple clicks
-                ;; which would create multiple states/ellipses for a
-                ;; single click
-                (if (empty? @objects) (draw-start-state-sym ellipse))
-                (display-state ellipse)
-                (if (empty? @objects)
-                  (swap! objects conj (assoc-in ellipse [1 :start?] true))
-                  (swap! objects conj ellipse)))
+                  ;; Prevent click from being processed as multiple clicks
+                  ;; which would create multiple states/ellipses for a
+                  ;; single click
+                  (if (empty? @objects) (draw-start-state-sym ellipse))
+                  (display-state ellipse)
+                  (if (empty? @objects)
+                    (swap! objects conj (assoc-in ellipse [1 :start?] true))
+                    (swap! objects conj ellipse)))
       ;; If state clicked & in transition mode, mark state as "from"
       ;; and switch to connect mode
       :transition (when-let
                       [captured
                        (and (q/mouse-pressed?) (capture-state @objects x y))]
-                    (swap! objects assoc (key captured) (assoc (val captured) :from true))
+                    (swap! objects assoc (key captured)
+                           (assoc (val captured) :from true))
 
                     (display-state captured 70)
 
