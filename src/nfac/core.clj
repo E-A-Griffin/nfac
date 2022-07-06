@@ -46,6 +46,8 @@
                 :stroke-s 0
                 :stroke-v 0}})
 
+(declare display-nfa)
+
 (defn set-theme!
   "Set theme based on current mode"
   [color-map mode]
@@ -116,21 +118,21 @@
   "Takes collection of states in and returns first state
   that returns true for \"(selected? state)\" as a map-entry."
   [states]
-  (->> states (some #(if (selected? %) %)) (apply map-entry)))
+  (->> states (some #(when (selected? %) %)) (apply map-entry)))
 
 (defn get-from
   "Returns first state from collection that returns true
   for (from? state). Returns state that was selected first,
   during transition mode."
   [states]
-  (->> states (some #(if (from? %) %)) (apply map-entry)))
+  (->> states (some #(when (from? %) %)) (apply map-entry)))
 
 (defn get-to
   "Returns first state from collection that returns true
   for (to? state). Returns state that was selected second,
   during transition mode."
   [states]
-  (->> states (some #(if (to? %) %)) (apply map-entry)))
+  (->> states (some #(when (to? %) %)) (apply map-entry)))
 
 (defn get-transition-count
   "Takes in two states e1 & e2 and returns the count for how
@@ -227,7 +229,7 @@
      (q/fill (mod (+ x y) 255) saturation 255)
      (q/ellipse x y r r)
      (q/no-fill)
-     (if (final? state) (q/ellipse (+ x 0.5) (+ y 0.5) (* r 0.8) (* r 0.8)))
+     (when (final? state) (q/ellipse (+ x 0.5) (+ y 0.5) (* r 0.8) (* r 0.8)))
      (q/fill 0)
      (q/rect-mode :center)
      (q/text-align :center)
@@ -276,7 +278,7 @@
 
          ;; Calculate slope if non-infinite, otherwise set slope to nil.
          ;; When slope is nil, set angle to 3pi/2
-         slope          (if (not (= xf xt)) (/ (- yf yt) (- xf xt)))
+         slope          (when (not (= xf xt)) (/ (- yf yt) (- xf xt)))
          angle          (if slope (q/atan slope) (* 1.5 q/PI))
          angle-offset   (cond
                           (> xf xt) 0
@@ -378,8 +380,7 @@
     \b (set-theme! color-map :light-mode)
 
     ;; Redraw sketch based on objects
-    \newline (do
-               (q/background ((color-map (q/state :theme)) :background))
+    \newline (do               (q/background ((color-map (q/state :theme)) :background))
                (display-nfa @objects))
 
     ;; Save nfa to file
@@ -469,7 +470,7 @@
                   ;; Prevent click from being processed as multiple clicks
                   ;; which would create multiple states/ellipses for a
                   ;; single click
-                  (if (empty? @objects) (draw-start-state-sym ellipse))
+                  (when (empty? @objects) (draw-start-state-sym ellipse))
                   (display-state ellipse)
                   (if (empty? @objects)
                     (swap! objects conj (assoc-in ellipse [1 :start?] true))
@@ -543,13 +544,13 @@
                 ;; Return to create mode
                 (swap! (q/state-atom) assoc-in [:mode] :create)))
       :set-final (when-let
-                     [final (if (q/mouse-pressed?)
+                     [final (when (q/mouse-pressed?)
                               (apply map-entry (assoc-in (capture-state @objects x y) [1 :final?] true)))]
                    (display-state final)
                    (swap! objects assoc (key final) (val final))
                    (swap! (q/state-atom) assoc-in [:mode] :create))
       :delete (when-let
-                  [delete (if (q/mouse-pressed?)
+                  [delete (when (q/mouse-pressed?)
                            (capture-state @objects x y))]
                 (swap! objects purge-transitions delete)
                 (swap! objects dissoc (key delete))
@@ -559,16 +560,16 @@
                     ;; Swap keys/names for deleted state and the last
                     ;; state in objects.
                     (if-let [last-o
-                               (if (pos? (compare
+                               (when (pos? (compare
                                     (key (last @objects)) (key delete)))
                                  (last @objects))]
                       (do (swap! objects assoc (key delete)
                                  (assoc (val last-o) :name (getname delete)))
-                      (if (-> delete val :start? true?) (swap! objects assoc-in [(key delete) :start?] true))
+                      (when (-> delete val :start? true?) (swap! objects assoc-in [(key delete) :start?] true))
                       (swap! objects dissoc (key last-o))
                       (swap! objects nested-rename-key
                              (key last-o) (key delete)))
-                      (when-let [last-o (if (-> delete val :start? true?)
+                      (when-let [last-o (when (-> delete val :start? true?)
                                         (last @objects))]
                         (swap! objects assoc (key delete)
                                (assoc (val last-o) :name (getname delete)))
@@ -578,7 +579,7 @@
                     (display-nfa @objects)))
                 (swap! (q/state-atom) assoc-in [:mode] :create))
       :set-start (when-let
-                     [start (if (q/mouse-pressed?)
+                     [start (when (q/mouse-pressed?)
                               (capture-state @objects x y))]
                    ;; Purge old start state's signifier
                    ;; (change :start? to false)
@@ -593,7 +594,7 @@
     ;; Prevents single click from being processed as multiple clicks
     ;; which could create multiple states or connect a state to itself
     ;; when unintended.
-    (if (q/mouse-pressed?) (q/delay-frame 70))))
+    (when (q/mouse-pressed?) (q/delay-frame 70))))
 
 
 
