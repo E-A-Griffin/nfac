@@ -29,7 +29,7 @@
   "Display the current value of :text within state-atom for sketch."
   []
   (q/text
-   (str \"(q/state :text)\") 300 110))
+   (str \" (q/state :text) \") 300 110))
 
 (defn draw-result
   "Display the result of whether the test string was accepted or

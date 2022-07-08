@@ -1,7 +1,6 @@
 ;; Functions for saving an NFA to saved-nfas/
 (ns nfac.save
   (:require [quil.core :as q]
-            [clojure.java.io :as io]
             [nfac.save :as sv]
             [nfac.objects :refer [objects]]))
 

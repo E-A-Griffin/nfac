@@ -3,7 +3,6 @@
 (ns nfac.core
   (:require [quil.core :as q]
             [quil.middleware :as m]
-            [clojure.java.io :as io]
             [clojure.set :as s]
             [nfac.objects :refer [objects test-strings]]
             [nfac.front-to-back :as f->b]
@@ -441,13 +440,12 @@
   ;; Set circle color.
   (q/fill (:color state) 255 255)
   ;; Calculate x and y coordinates of the circle.
-  (let [color (:color state)
-        x (q/mouse-x)
+  (let [x (q/mouse-x)
         y (q/mouse-y)]
 
     ;; Check for user key input and perform actions on sketch, state, and
     ;; objects based on input
-    (if (and (q/key-pressed?) (not= (state :mode) :poll)) (check-for-keys))
+    (when (and (q/key-pressed?) (not= (state :mode) :poll)) (check-for-keys))
 
     (when (get @objects :reload)
       (q/background 255)
@@ -499,10 +497,9 @@
                          (capture-state @objects x y))]
 
                  (let [from (get-from @objects)]
-                   (do
-                     (display-state to 80)
-                     (swap! objects assoc (key to) (assoc (val to) :to true))
-                     (swap! (q/state-atom) assoc-in [:mode] :poll))))
+                   (display-state to 80)
+                   (swap! objects assoc (key to) (assoc (val to) :to true))
+                   (swap! (q/state-atom) assoc-in [:mode] :poll)))
       ;; Once user enters a character for the transition function. Create
       ;; transition function between 'from' selected in transition mode and
       ;; 'to' selected in connect mode.
@@ -530,7 +527,7 @@
                                 (dissoc (val to) :to)
                                 ;; Add transition function to val
                                 [:in (getname from)] conj transition-ch)))
-                    (do (swap! objects assoc (key from)
+                    (swap! objects assoc (key from)
                            (update-in
                             (update-in
                              ;; Strip :from & :to pairs from val
@@ -538,7 +535,7 @@
                              ;; Add transition function to :out & :in since
                              ;; function is a loop
                              [:out (getname from)] conj transition-ch)
-                            [:in (getname from)] conj transition-ch)))))
+                            [:in (getname from)] conj transition-ch))))
 
                 (q/delay-frame 70)
                 ;; Return to create mode

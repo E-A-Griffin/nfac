@@ -66,7 +66,7 @@
               valid-transitions (filter (fn [t]
                                           (or (= (:accepts t) c)
                                               (= (:accepts t) \λ))) transitions)
-              contains-lambda? (not (empty? (filter (fn [t] (= (:accepts t) \λ)) valid-transitions)))]
+              contains-lambda? (seq (filter (fn [t] (= (:accepts t) \λ)) valid-transitions))]
 
           (cond (empty? in-str)               ;if the string is empty,
                 (cond (= (:final? node) true) ;check to see if the current node is final
@@ -90,7 +90,7 @@
                 (empty? valid-transitions) ;if there are no valid transitions but the string still has characters to test,
                 (response false node)      ;return a false response.
 
-                (not (empty? valid-transitions)) ;If there ARE valid transitions
+                (seq valid-transitions) ;If there ARE valid transitions
                 (if (= 1 (count valid-transitions))
                   (if (= (:accepts (first valid-transitions)) \λ)
                     (<! (test-string-r in-str

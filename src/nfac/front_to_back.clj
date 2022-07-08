@@ -17,7 +17,7 @@
 (defn get-start-node
   "Return the (first/only) start state/node from the front-end map of states."
   [front-struct]
-  (some (fn [[k v]] (if (v :start?) k)) front-struct))
+  (some (fn [[k v]] (when (v :start?) k)) front-struct))
 
 (defn single-node-front->back
   "Convert a singular front-end state/node to a singular back-end state/node."
