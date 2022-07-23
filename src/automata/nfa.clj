@@ -1,10 +1,8 @@
 (ns automata.nfa
   (:require [clojure.core.async
              :as async
-             :refer [>! <! >!! <!!
-                     go chan buffer close!
-                     thread
-                     offer! poll!]]))
+             :refer [<! <!!
+                     go chan]]))
 
 (def nfa-state (atom {:start-node nil
                       :nodes nil}))
@@ -56,7 +54,14 @@
 (def debug-message (chan))
 
 (defn test-string-r
-  "This function is a recursive and multi-threaded implementation of a NFA/NFA traversal algorithm. It accepts an input string (in-str) and a node (node), and tests whether or not the transitions originating from that node will accept the in-str value. If it does, then the evaluation is placed on another thread, along with all of the other valid transitions originating from this node, and evaluated recursively until either no result is found, or the string tests true, at which point the async channel closes and no further data can be pushed into it."
+  "This function is a recursive and multi-threaded implementation of a NFA/NFA
+  traversal algorithm. It accepts an input string (in-str) and a node (node),
+  and tests whether or not the transitions originating from that node will
+  accept the in-str value. If it does, then the evaluation is placed on another
+  thread, along with all of the other valid transitions originating from this
+  node, and evaluated recursively until either no result is found, or the
+  string tests true, at which point the async channel closes and no further
+  data can be pushed into it."
   [in-str node depth]
   (go (if (< 0 depth)
         (let [c (first in-str)
@@ -66,7 +71,8 @@
               valid-transitions (filter (fn [t]
                                           (or (= (:accepts t) c)
                                               (= (:accepts t) \λ))) transitions)
-              contains-lambda? (seq (filter (fn [t] (= (:accepts t) \λ)) valid-transitions))]
+              contains-lambda? (seq (filter (fn [t] (= (:accepts t) \λ))
+                                            valid-transitions))]
 
           (cond (empty? in-str)               ;if the string is empty,
                 (cond (= (:final? node) true) ;check to see if the current node is final
@@ -168,25 +174,28 @@
   (doseq [node nodes]
     (add-node node)))
 
+;; TODO: Refactor `delete-node` to be split into `delete-nodes` & `delete-node`
 (defn delete-node
   "This function deletes a node from the state"
-  [label]
-  (let [key (keyword label)
-        node (get-in @nfa-state [:nodes key])]
-    (if-not (= node nil)
-      (do
-        (swap! nfa-state assoc :nodes (into {} (remove (fn [[k e]]
-                                                         (if (= k key)
-                                                           (do
-                                                             (if (= k (:start-node @nfa-state))
-                                                               (swap! nfa-state assoc :start-node nil))
-                                                             true)
-                                                           false))
-                                                       (:nodes @nfa-state))))))))
-
-(defn delete-node [& labels]
-  (doseq [label labels]
-    (delete-node label)))
+  ([label]
+   (let [key (keyword label)
+         node (get-in @nfa-state [:nodes key])]
+     (when-not (= node nil)
+       (swap! nfa-state assoc :nodes (into
+                                      {}
+                                      (remove
+                                       (fn [[k _]]
+                                         (if (= k key)
+                                           (do
+                                             (when (= k (:start-node @nfa-state))
+                                               (swap! nfa-state assoc
+                                                      :start-node nil))
+                                             true)
+                                           false))
+                                       (:nodes @nfa-state)))))))
+  ([& labels]
+   (doseq [label labels]
+     (delete-node label))))
 
 (defn add-transition
   "This function adds a transition to the NFA by inserting the transition map into the
@@ -205,15 +214,18 @@
                                                 (vec transitions))}))))
 
 (defn remove-transition
-  "This function removes a transition from the NFA by removing the transition map from the node defined by the \"begin-state\" key-val pair."
+  "This function removes a transition from the NFA by removing the transition
+  map from the node defined by the \"begin-state\" key-val pair."
   [transition]
   (let [node-label (:begin-state transition)
         node (get-in [:nodes (keyword node-label)] @nfa-state)]
-    (swap! nfa-state assoc-in [:nodes (keyword node-label) :transitions] (vec (remove #(= transition)
-                                                                                  (:transitions node))))))
+    (swap! nfa-state assoc-in [:nodes (keyword node-label) :transitions]
+           (vec (remove #(= % transition)
+                        (:transitions node))))))
 
 (defn clear-state
-  "This function resets the state to its initial empty state, where all keys in the map have a value of nil"
+  "This function resets the state to its initial empty state, where all keys in
+  the map have a value of nil"
   []
   (reset! nfa-state {:start-node nil
                      :nodes nil}))

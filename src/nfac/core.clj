@@ -47,6 +47,14 @@
 
 (declare display-nfa)
 
+
+(defn redraw-sketch!
+  "Redraw current sketch to reflect changes"
+  []
+  (q/background ((color-map (q/state :theme)) :background))
+  (display-nfa @objects)
+  (println "redrawing"))
+
 (defn set-theme!
   "Set theme based on current mode"
   [color-map mode]
@@ -59,9 +67,7 @@
                 (mode-map :stroke-s)
                 (mode-map :stroke-v))
       (swap! (q/state-atom) assoc-in [:theme] mode)
-      ;; Redraw current NFA in current theme
-      (q/background ((color-map (q/state :theme)) :background))
-      (display-nfa @objects))))
+      (redraw-sketch!))))
 
 (defn map-entry
   "Create a singular map-entry from a key (k) and a value (v)"
@@ -349,6 +355,7 @@
       ;; Else draw state alone
       (display-state from))))
 
+
 (defn create-logo
   "Used to recreate states to represent NFAC logo."
   []
@@ -379,8 +386,10 @@
     \b (set-theme! color-map :light-mode)
 
     ;; Redraw sketch based on objects
-    \newline (do               (q/background ((color-map (q/state :theme)) :background))
-               (display-nfa @objects))
+    \newline (redraw-sketch!)
+    ;; (do
+    ;;            (q/background ((color-map (q/state :theme)) :background))
+    ;;            (display-nfa @objects))
 
     ;; Save nfa to file
     \s (apply q/sketch sv/save-ske)
@@ -580,12 +589,11 @@
                               (capture-state @objects x y))]
                    ;; Purge old start state's signifier
                    ;; (change :start? to false)
-                   (let [old-start-k (f->b/get-start-node @objects)
-                         old-start-v (get @objects old-start-k)]
+                   (let [old-start-k (f->b/get-start-node @objects)]
                      (swap! objects assoc-in
                             [old-start-k :start?] false))
                    (swap! objects assoc-in [(key start) :start?] true)
-                   (display-nfa @objects)
+                   (redraw-sketch!)
                    (swap! (q/state-atom) assoc-in [:mode] :create)))
 
     ;; Prevents single click from being processed as multiple clicks
