@@ -2,7 +2,8 @@
   (:require [clojure.core.async
              :as async
              :refer [<! <!!
-                     go chan]]))
+                     go chan]]
+            [clojure.string :as str]))
 
 (def nfa-state (atom {:start-node nil
                       :nodes nil}))
@@ -65,7 +66,7 @@
   [in-str node depth]
   (go (if (< 0 depth)
         (let [c (first in-str)
-              str-rest (clojure.string/join (rest in-str))
+              str-rest (str/join (rest in-str))
               cur-node-label (:label node)
               transitions (:transitions node)
               valid-transitions (filter (fn [t]
@@ -73,53 +74,73 @@
                                               (= (:accepts t) \λ))) transitions)
               contains-lambda? (seq (filter (fn [t] (= (:accepts t) \λ))
                                             valid-transitions))]
+          (prn cur-node-label)
+          (cond
+            ;if the string is empty,
+            (empty? in-str) (cond ; check to see if the current node is final
+                                  ; if it is, Wonderful! Put a response into the
+                                  ; channel
+                              (= (:final? node) true) (response true node)                   (= contains-lambda? true)
+                              (or (->> (for [transition valid-transitions]
+                                         (when (= (:accepts transition) \λ)
+                                           (test-string-r in-str
+                                                          (get-state-node
+                                                           (:end-state
+                                                            transition))
+                                                          (dec depth))))
+                                       (into [])
+                                       async/merge
+                                       (async/into [])
+                                       <!
+                                       (filter :result)
+                                       first)
+                                  (response false node))
+                              :else
+                              (response false node)) ;Otherwise, it's not valid.
 
-          (cond (empty? in-str)               ;if the string is empty,
-                (cond (= (:final? node) true) ;check to see if the current node is final
-                      (response true node) ;if it is, Wonderful! Put a response into the
-                      (= contains-lambda? true)
-                      (or (->> (for [transition valid-transitions]
-                                 (if (= (:accepts transition) \λ)
-                                   (test-string-r in-str
-                                                  (get-state-node (:end-state transition))
-                                                  (dec depth))))
-                               (into [])
-                               async/merge
-                               (async/into [])
-                               <!
-                               (filter :result)
-                               first)
-                          (response false node))
-                      :else
-                      (response false node)) ;Otherwise, it's not valid.
+                ; if there are no valid transitions but the string still has
+                ; characters to test, return a false response.
+                (empty? valid-transitions) (response false node)
 
-                (empty? valid-transitions) ;if there are no valid transitions but the string still has characters to test,
-                (response false node)      ;return a false response.
-
-                (seq valid-transitions) ;If there ARE valid transitions
-                (if (= 1 (count valid-transitions))
-                  (if (= (:accepts (first valid-transitions)) \λ)
-                    (<! (test-string-r in-str
-                                       (get-state-node (:end-state (first valid-transitions)))
-                                       (dec depth)))
-                    (<! (test-string-r str-rest
-                                       (get-state-node (:end-state (first valid-transitions)))
-                                       (dec depth))))
-                  (or (->> (for [transition valid-transitions]
-                             (if (= (:accepts transition) \λ)
-                               (test-string-r in-str
-                                              (get-state-node (:end-state transition))
-                                              (dec depth))
-                               (test-string-r str-rest
-                                              (get-state-node (:end-state transition))
-                                              (dec depth))))
-                           (into [])
-                           async/merge
-                           (async/into [])
-                           <!
-                           (filter :result)
-                           first)
-                      (response false node)))))
+                ; If there ARE valid transitions
+                (seq valid-transitions) (if (= 1 (count valid-transitions))
+                                          (if (=
+                                               (:accepts
+                                                (first valid-transitions)) \λ)
+                                            (<! (test-string-r
+                                                 in-str
+                                                 (get-state-node
+                                                  (:end-state
+                                                   (first valid-transitions)))
+                                                 (dec depth)))
+                                            (<! (test-string-r
+                                                 str-rest
+                                                 (get-state-node
+                                                  (:end-state
+                                                   (first valid-transitions)))
+                                                 (dec depth))))
+                                          (or
+                                           (->> (for [transition
+                                                      valid-transitions]
+                                                  (if (= (:accepts transition)
+                                                         \λ)
+                                                    (test-string-r
+                                                     in-str
+                                                     (get-state-node
+                                                      (:end-state transition))
+                                                     (dec depth))
+                                                    (test-string-r
+                                                     str-rest
+                                                     (get-state-node
+                                                      (:end-state transition))
+                                                     (dec depth))))
+                                                (into [])
+                                                async/merge
+                                                (async/into [])
+                                                <!
+                                                (filter :result)
+                                                first)
+                                           (response false node)))))
         (response false node))))
 
 (defn test-string
