@@ -1,7 +1,7 @@
 # nfac - Nondeterministic Finite Automata Creator
 <p align="center">
-        <img width="389" height="155" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFA-Logo.png">
- </p>
+  <img width="389" height="155" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFA-Logo.png">
+</p>
 Application built in Clojure using the Quil library for constructing Nondeterministic Finite Automata and testing input strings for membership in the language described by the user's automaton.
 
 ## Starting Application

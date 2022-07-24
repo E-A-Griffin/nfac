@@ -4,7 +4,7 @@
   (:require [quil.core :as q]
             [quil.middleware :as m]
             [clojure.set :as s]
-            [nfac.objects :refer [objects test-strings]]
+            [nfac.objects :refer [objects]]
             [nfac.front-to-back :as f->b]
             [nfac.load :as ld]
             [nfac.save :as sv]
@@ -112,6 +112,11 @@
   "Returns true if state selected represents a final state."
   [state] (-> state val :final? true?))
 
+(defn start?
+  "Return name of start node"
+  [state]
+  (-> state val :start? true?))
+
 (defn transition-exists?
   "Returns whether or not transition already exists. Useful for
   preventing user from creating duplicate transition functions."
@@ -139,6 +144,11 @@
   [states]
   (->> states (some #(when (to? %) %)) (apply map-entry)))
 
+(defn get-start-node-name
+  "Return name of start node."
+  [states]
+  (->> states (some #(when (start? %) %)) first))
+
 (defn get-transition-count
   "Takes in two states e1 & e2 and returns the count for how
   many transition functions exist from e1->e2."
@@ -158,7 +168,6 @@
   (let [x (- (getx state) (/ r 2))
         y (gety state)]
     (q/no-fill)
-    ;(apply q/stroke (-> q/state :theme))
     (q/triangle
      (- x (/ r 2)) (- y (/ r 2)) (- x (/ r 2)) (+ y (/ r 2)) x y)))
 

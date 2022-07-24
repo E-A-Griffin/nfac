@@ -80,21 +80,26 @@
             (empty? in-str) (cond ; check to see if the current node is final
                                   ; if it is, Wonderful! Put a response into the
                                   ; channel
-                              (= (:final? node) true) (response true node)                   (= contains-lambda? true)
-                              (or (->> (for [transition valid-transitions]
-                                         (when (= (:accepts transition) \λ)
-                                           (test-string-r in-str
-                                                          (get-state-node
-                                                           (:end-state
-                                                            transition))
-                                                          (dec depth))))
-                                       (into [])
-                                       async/merge
-                                       (async/into [])
-                                       <!
-                                       (filter :result)
-                                       first)
-                                  (response false node))
+                              (= (:final? node) true) (response true node)
+                              (= contains-lambda?
+                                 true) (or
+                                        (->>
+                                         (for
+                                             [transition
+                                              valid-transitions]
+                                           (when (= (:accepts transition) \λ)
+                                             (test-string-r in-str
+                                                            (get-state-node
+                                                             (:end-state
+                                                              transition))
+                                                            (dec depth))))
+                                         (into [])
+                                         async/merge
+                                         (async/into [])
+                                         <!
+                                         (filter :result)
+                                         first)
+                                        (response false node))
                               :else
                               (response false node)) ;Otherwise, it's not valid.
 
@@ -214,8 +219,8 @@
                                              true)
                                            false))
                                        (:nodes @nfa-state)))))))
-  ([& labels]
-   (doseq [label labels]
+  ([label & rest-labels]
+   (doseq [label (conj rest-labels label)]
      (delete-node label))))
 
 (defn add-transition
