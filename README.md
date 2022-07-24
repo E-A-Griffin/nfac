@@ -3,6 +3,7 @@
 ![GitHub-Mark-Dark](https://github.com/E-A-Griffin/nfac/blob/master/nfac-logo-dark.png#gh-dark-mode-only)
 <p align="center">
   <img width="389" height="155" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFA-Logo.png#gh-light-mode-only">
+  <img width="389" height="155" src="https://github.com/E-A-Griffin/DFAC/blob/master/nfac-logo-dark.png#gh-light-dark-only">
 </p>
 Application built in Clojure using the Quil library for constructing Nondeterministic Finite Automata and testing input strings for membership in the language described by the user's automaton.
 
