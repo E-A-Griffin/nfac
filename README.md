@@ -1,6 +1,7 @@
 # nfac - Nondeterministic Finite Automata Creator
 <p align="center">
-  ![GitHub-Mark-Light](https://github.com/E-A-Griffin/nfac/blob/master/NFA-Logo.png#gh-light-mode-only)![GitHub-Mark-Dark](https://github.com/E-A-Griffin/nfac/blob/master/nfac-logo-dark.png#gh-dark-mode-only)
+  ![GitHub-Mark-Light](https://github.com/E-A-Griffin/nfac/blob/master/NFA-Logo.png#gh-light-mode-only)
+![GitHub-Mark-Dark](https://github.com/E-A-Griffin/nfac/blob/master/nfac-logo-dark.png#gh-dark-mode-only)
 </p>
 <p align="center">
   <img width="389" height="155" src="https://github.com/E-A-Griffin/DFAC/blob/master/NFA-Logo.png">
