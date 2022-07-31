@@ -3,12 +3,14 @@
 (ns nfac.core
   (:require [quil.core :as q]
             [quil.middleware :as m]
-            [clojure.set :as s]
+            [clojure.set :as set]
+            [clojure.spec.alpha :as spec]
             [nfac.objects :refer [objects]]
             [nfac.front-to-back :as f->b]
             [nfac.load :as ld]
             [nfac.save :as sv]
             [nfac.test-string :as t-str]
+            [nfac.nfa-spec]
             ;; Back-end
             [automata.nfa :as b]))
 
@@ -112,17 +114,12 @@
   "Returns true if state selected represents a final state."
   [state] (-> state val :final? true?))
 
-(defn start?
-  "Return name of start node"
-  [state]
-  (-> state val :start? true?))
-
 (defn transition-exists?
   "Returns whether or not transition already exists. Useful for
   preventing user from creating duplicate transition functions."
   [from to transition-ch]
   (->> (-> from val :out (get (getname to)))
-           (some #(if (= % transition-ch) %)) char?))
+           (some #(when (= % transition-ch) %)) char?))
 
 (defn get-selected
   "Takes collection of states in and returns first state
@@ -143,11 +140,6 @@
   during transition mode."
   [states]
   (->> states (some #(when (to? %) %)) (apply map-entry)))
-
-(defn get-start-node-name
-  "Return name of start node."
-  [states]
-  (->> states (some #(when (start? %) %)) first))
 
 (defn get-transition-count
   "Takes in two states e1 & e2 and returns the count for how
@@ -199,8 +191,8 @@
   (into {}
         (map
          #(assoc-in (assoc-in % [1 :out]
-                              (-> % val :out (s/rename-keys {old-k new-k})))
-                    [1 :in] (-> % val :out (s/rename-keys {old-k new-k})))
+                              (-> % val :out (set/rename-keys {old-k new-k})))
+                    [1 :in] (-> % val :out (set/rename-keys {old-k new-k})))
          m)))
 
 (defn capture-state
@@ -233,9 +225,10 @@
 
 (defn display-state
   "Draw state passed as argument to screen"
-  ([state]
-   (display-state state (+ 100 (mod (getx state) 130))))
-  ([state saturation]
+  ([state & {:keys [saturation spec?]
+             :or   {saturation (+ 100 (mod (getx state) 130))
+                    spec?      true}}]
+   (when spec? (spec/valid? :nfac.nfa-spec/nfa state))
    (let [x    (getx state)
          y    (gety state)
          name (getname state)]
@@ -253,10 +246,13 @@
 (defn display-states
   "Draw all ellipses passed as arguments to screen."
   [states]
+  ;; Check all states once rather than calling spec/valid?
+  ;; each time display-state is invoked
+  (spec/valid? :nfac.nfa-spec/nfa states)
   (loop [remaining (rest states)
          current (first states)]
     (when current
-      (display-state current)
+      (display-state current :spec? false)
       (recur (rest remaining) (first remaining)))))
 
 (defn put-letter-transition
@@ -346,9 +342,10 @@
   state alone. Note, flips order of transition characters on each draw.
   Since order doesn't matter, this is left alone."
   [states]
-  ;(q/background 255)
+  ;; Check that states are valid
+  (spec/explain :nfac.nfa-spec/nfa states)
   ;; Draw triangle indicating which ellipse represents initial state
-  (let [start-key (f->b/get-start-node states)]
+  (when-let [start-key (f->b/get-start-node states)]
     (draw-start-state-sym (map-entry start-key (get states start-key))))
   (doseq [from states]
     (if-not (empty? (-> from val :out))
@@ -362,7 +359,7 @@
                 (connect-states
                  from to-state transition-ch displacement)))))
       ;; Else draw state alone
-      (display-state from))))
+      (display-state from :spec? false))))
 
 
 (defn create-logo
@@ -396,9 +393,6 @@
 
     ;; Redraw sketch based on objects
     \newline (redraw-sketch!)
-    ;; (do
-    ;;            (q/background ((color-map (q/state :theme)) :background))
-    ;;            (display-nfa @objects))
 
     ;; Save nfa to file
     \s (apply q/sketch sv/save-ske)
@@ -475,7 +469,7 @@
       :create (when-let
                   ;; Format: Map-Entry of the form
                   ;;
-                  ;; k: "x-y"
+                  ;; k: "name"
                   ;; v: {:name "name" :x x :y y}
                   [ellipse (when (q/mouse-pressed?)
                                    (map-entry (str \q (count @objects))
@@ -487,10 +481,11 @@
                   ;; which would create multiple states/ellipses for a
                   ;; single click
                   (when (empty? @objects) (draw-start-state-sym ellipse))
-                  (display-state ellipse)
                   (if (empty? @objects)
                     (swap! objects conj (assoc-in ellipse [1 :start?] true))
-                    (swap! objects conj ellipse)))
+                    (swap! objects conj ellipse))
+                  (prn @objects)
+                  (display-state ellipse))
       ;; If state clicked & in transition mode, mark state as "from"
       ;; and switch to connect mode
       :transition (when-let
@@ -499,7 +494,7 @@
                     (swap! objects assoc (key captured)
                            (assoc (val captured) :from true))
 
-                    (display-state captured 70)
+                    (display-state captured :saturation 70)
 
                     ;; First/'from' state selected, switch mode so that
                     ;; next/'to' state may be selected
@@ -515,7 +510,7 @@
                          (capture-state @objects x y))]
 
                  (let [from (get-from @objects)]
-                   (display-state to 80)
+                   (display-state to :saturation 80)
                    (swap! objects assoc (key to) (assoc (val to) :to true))
                    (swap! (q/state-atom) assoc-in [:mode] :poll)))
       ;; Once user enters a character for the transition function. Create
@@ -561,37 +556,35 @@
       :set-final (when-let
                      [final (when (q/mouse-pressed?)
                               (apply map-entry (assoc-in (capture-state @objects x y) [1 :final?] true)))]
-                   (display-state final)
                    (swap! objects assoc (key final) (val final))
-                   (swap! (q/state-atom) assoc-in [:mode] :create))
+                   (swap! (q/state-atom) assoc-in [:mode] :create)
+                   (display-state final))
       :delete (when-let
-                  [delete (when (q/mouse-pressed?)
-                           (capture-state @objects x y))]
+                  [delete (when (or (println "deleting") (q/mouse-pressed?))
+                            (capture-state @objects x y))]
                 (swap! objects purge-transitions delete)
                 (swap! objects dissoc (key delete))
-                (if (empty? @objects)
-                  (q/background 255)
-                  (do
-                    ;; Swap keys/names for deleted state and the last
-                    ;; state in objects.
-                    (if-let [last-o
-                               (when (pos? (compare
-                                    (key (last @objects)) (key delete)))
-                                 (last @objects))]
-                      (do (swap! objects assoc (key delete)
-                                 (assoc (val last-o) :name (getname delete)))
-                      (when (-> delete val :start? true?) (swap! objects assoc-in [(key delete) :start?] true))
-                      (swap! objects dissoc (key last-o))
-                      (swap! objects nested-rename-key
-                             (key last-o) (key delete)))
-                      (when-let [last-o (when (-> delete val :start? true?)
-                                        (last @objects))]
-                        (swap! objects assoc (key delete)
+                (when-not (empty? @objects)
+                  ;; Swap keys/names for deleted state and the last
+                  ;; state in objects.
+                  (if-let [last-o
+                           (when (pos? (compare
+                                        (key (last @objects)) (key delete)))
+                             (last @objects))]
+                    (do (swap! objects assoc (key delete)
                                (assoc (val last-o) :name (getname delete)))
-                        (swap! objects assoc-in [(key delete) :start?] true)
+                        (when (-> delete val :start? true?) (swap! objects assoc-in [(key delete) :start?] true))
                         (swap! objects dissoc (key last-o))
-                        (swap! objects nested-rename-key (key last-o) (key delete))))
-                    (display-nfa @objects)))
+                        (swap! objects nested-rename-key
+                               (key last-o) (key delete)))
+                    (when-let [last-o (when (-> delete val :start? true?)
+                                        (last @objects))]
+                      (swap! objects assoc (key delete)
+                             (assoc (val last-o) :name (getname delete)))
+                      (swap! objects assoc-in [(key delete) :start?] true)
+                      (swap! objects dissoc (key last-o))
+                      (swap! objects nested-rename-key (key last-o) (key delete)))))
+                (redraw-sketch!)
                 (swap! (q/state-atom) assoc-in [:mode] :create))
       :set-start (when-let
                      [start (when (q/mouse-pressed?)

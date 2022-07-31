@@ -2,9 +2,19 @@
 ;; membership in language described by NFA.
 (ns nfac.test-string
   (:require [quil.core :as q]
-            [nfac.core :refer [get-start-node-name]]
             [nfac.objects :refer [objects]]
             [automata.nfa :as b]))
+
+(defn start?
+  "Return name of start node"
+  [state]
+  (-> state val :start? true?))
+
+(defn get-start-node-name
+  "Return name of start node."
+  [states]
+  (->> states (some #(when (start? %) %)) first))
+
 
 (defn prompt
   "Prompt displaying instructions for the user to enter test string(s)."
