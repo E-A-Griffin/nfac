@@ -384,9 +384,6 @@
     (display-state c)))
 
 (defn check-for-keys []
-  (prn "raw-key: " (q/raw-key))
-  (prn "key-code: " (q/key-code))
-  (prn "key-coded: " (q/key-coded? (q/raw-key)))
   (case (q/raw-key)
     ;; Swap state mode based on user input
     \t (swap! (q/state-atom) assoc-in [:mode] :transition)
