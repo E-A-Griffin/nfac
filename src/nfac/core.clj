@@ -47,6 +47,8 @@
                 :stroke-s 0
                 :stroke-v 0}})
 
+(def shift-code 38)
+
 (declare display-nfa)
 
 
@@ -332,9 +334,11 @@
   ;; loops as well. Call 4-arity version of connect-states with current value of q/raw-key
   ;; (or \λ if enter is pressed) and displacement between transition function and placement
   ;; of character (based on existence of other transition functions between the states).
-  ([from to] (connect-states from to
-                             (if (= (q/raw-key) \newline) \λ (q/raw-key))
-                             (get-disp from to))))
+  ([from to]
+   (let [raw-key (q/raw-key)]
+     (connect-states from to
+                     (if (= raw-key \newline) \λ raw-key)
+                     (get-disp from to)))))
 
 (defn display-nfa
   "Draw transitions between states/ellipses based on values of :out
@@ -380,6 +384,9 @@
     (display-state c)))
 
 (defn check-for-keys []
+  (prn "raw-key: " (q/raw-key))
+  (prn "key-code: " (q/key-code))
+  (prn "key-coded: " (q/key-coded? (q/raw-key)))
   (case (q/raw-key)
     ;; Swap state mode based on user input
     \t (swap! (q/state-atom) assoc-in [:mode] :transition)
@@ -459,8 +466,9 @@
     ;; objects based on input
     (when (and (q/key-pressed?) (not= (state :mode) :poll)) (check-for-keys))
 
+    ;; TODO: check if still in use
     (when (get @objects :reload)
-      (q/background 255)
+      (q/background ((color-map (q/state :theme)) :background))
       (swap! objects dissoc :reload)
       (display-nfa @objects))
 
@@ -516,7 +524,8 @@
       ;; Once user enters a character for the transition function. Create
       ;; transition function between 'from' selected in transition mode and
       ;; 'to' selected in connect mode.
-      :poll (when (q/key-pressed?)
+      :poll (when (and (q/key-pressed?)
+                       (not (q/key-coded? (q/raw-key))))
               ;; Create transition function
               (let [from (get-from @objects)
                     to   (get-to @objects)

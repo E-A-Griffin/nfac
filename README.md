@@ -35,8 +35,6 @@ nfac supports loading/saving existing NFAs to file. In order to save the current
 
 This software has been tested on a particular set of hardware, and tuned to process user clicks in a responsive way without duplicating clicks (as Quil is prone to doing by default), as such, you may find that on your system clicks are processed too slowly or too quickly. If this happens, feel free to open an issue for it and we can try to come up with a more portable solution.
 
-Certain inputs such as `"` that require `Shift + '` on a conventional keyboard, are not processed properly at the moment and should be avoided as input until this issue is addressed.
-
 ## License
 
 Copyright © 2016
